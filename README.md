@@ -34,7 +34,7 @@ ___
 1. Ensure the [Build Environment](#build-environment) requirements are met.
 1. Clone repository into `<project_root>` folder
 1. Run `mvn test` from `<project_root>`. Fix test errors if needed. Errors, if they occur, will likely be from misconfiguration of R and the jsonlite library.
-1. Run `mvn install` from `<project_root>`. 
+1. Run `mvn install` from `<project_root>`. Or `mvn install -Dmaven.test.skip=true -Dlicense.skip`
 msusel-pique is now available as a dependency to extend in a personal project. 
 *(Eventually `mvn deploy` will be used instead.)*
 

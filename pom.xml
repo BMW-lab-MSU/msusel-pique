@@ -102,6 +102,7 @@
     </dependency>
 
     <!-- visualize dependencies -->
+<!--    https://github.com/jfree/jfreechart.git-->
     <dependency>
       <groupId>org.jfree</groupId>
       <artifactId>jfreechart</artifactId>
