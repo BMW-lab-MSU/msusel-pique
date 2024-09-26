@@ -47,7 +47,11 @@
       "description" : "",
       "children" : {
         "Yara email Diagnostic" : { }
-      }
+      },
+      "thresholds": [
+        0,
+        0
+      ]
     },
     "CVE-CWE-123 Measure" : {
       "positive" : false,
@@ -55,7 +59,11 @@
       "description" : "",
       "children" : {
         "CVE-CWE-123 Diagnostic" : { }
-      }
+      },
+      "thresholds": [
+        0,
+        0
+      ]
     },
     "CWE-123 Weakness Measure" : {
       "positive" : false,
@@ -63,7 +71,11 @@
       "description" : "",
       "children" : {
         "CWE-123 Weakness Diagnostic" : { }
-      }
+      },
+      "thresholds": [
+        0,
+        0
+      ]
     }
   },
   "diagnostics" : {
