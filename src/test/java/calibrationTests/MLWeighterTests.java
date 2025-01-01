@@ -17,6 +17,7 @@ import pique.calibration.WeightResult;
 import pique.model.QualityModel;
 import pique.model.QualityModelImport;
 import utilities.PiqueTestProperties;
+import utilities.PiqueTestProperties_afterBenchmarker;
 
 public class MLWeighterTests {
 
@@ -24,7 +25,7 @@ public class MLWeighterTests {
     public void SimpleCWEWeighterTest() {
         String pathToCsv = "./src/test/resources/comparisons.csv";
 
-        Properties prop = PiqueTestProperties.getProperties();
+        Properties prop = PiqueTestProperties_afterBenchmarker.getProperties();
 
         Path blankqmFilePath = Paths.get(prop.getProperty("blankqm.filepath"));
 
