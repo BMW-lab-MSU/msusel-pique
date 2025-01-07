@@ -22,7 +22,7 @@ import utilities.PiqueTestProperties_afterBenchmarker;
 public class MLWeighterTests {
 
     @Test
-    public void SimpleCWEWeighterTest() {
+    public void SimpleMLWeighterTest() {
         String pathToCsv = "./src/test/resources/comparisons.csv";
 
         Properties prop = PiqueTestProperties_afterBenchmarker.getProperties();
