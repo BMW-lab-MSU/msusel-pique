@@ -15,11 +15,18 @@
     "quality_aspects" : {
       "Confidentiality" : {
         "description" : "Information is not made available or disclosed to unauthorized individuals, entities, or processes.",
-        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator"
+        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator",
+        "children" : {
+          "Category CWE-234" : {}
+        }
       },
       "Integrity" : {
         "description" : "Data or processes cannot be modified in an unauthorized way.",
-        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator"
+        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator",
+        "children" : {
+          "Category CWE-234" : {},
+          "Category CWE-123" : {}
+        }
       }
     },
     "product_factors" : {
@@ -27,7 +34,8 @@
         "description" : "",
         "eval_strategy" : "pique.evaluation.DefaultProductFactorEvaluator",
         "children" : {
-          "Yara email Measure" : {}
+          "Yara email Measure" : {},
+          "CVE-CWE-123 Measure" : { }
         }
       },
       "Category CWE-123" : {
@@ -50,7 +58,9 @@
       },
       "thresholds": [
         0,
-        0
+        0.3,
+        0.5,
+        1
       ]
     },
     "CVE-CWE-123 Measure" : {
@@ -62,7 +72,9 @@
       },
       "thresholds": [
         0,
-        0
+        0.5,
+        0.4,
+        1
       ]
     },
     "CWE-123 Weakness Measure" : {
@@ -74,7 +86,9 @@
       },
       "thresholds": [
         0,
-        0
+        0.7,
+        0.6,
+        1
       ]
     }
   },

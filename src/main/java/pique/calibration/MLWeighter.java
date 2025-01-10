@@ -30,11 +30,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.commons.lang3.ArrayUtils;
 
@@ -43,6 +39,23 @@ import pique.calibration.WeightResult;
 import pique.model.ModelNode;
 import pique.model.QualityModel;
 import pique.utility.BigDecimalWithContext;
+
+import weka.core.Utils;
+import weka.classifiers.Classifier;
+import weka.core.Instance;
+import weka.core.Instances;
+import weka.core.converters.ConverterUtils.DataSource;
+import weka.classifiers.functions.LinearRegression;
+import weka.classifiers.functions.SimpleLinearRegression;
+import weka.classifiers.functions.Logistic;
+import weka.core.WekaPackageManager;
+
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+
+import java.util.ArrayList;
+
+import static java.lang.Long.sum;
 
 /**
  * @author Andrew Johnson
@@ -57,6 +70,7 @@ public class MLWeighter implements IWeighter{
     private String[] msNames;
     private BigDecimalWithContext[][] manWeights;
     private BigDecimalWithContext[][] comparisonMat;
+    private BigDecimalWithContext[][] measMat;
     private int numQA;
     private int numPF;
     private int numMS;
@@ -83,6 +97,7 @@ public class MLWeighter implements IWeighter{
 
         manWeights = new BigDecimalWithContext[numPF][numQA];
         comparisonMat = new BigDecimalWithContext[numQA][numQA];
+        measMat = new BigDecimalWithContext[numMS][numQA];
 
         List<String> modelQANames = new ArrayList<String>();
         List<String> modelPFNames = new ArrayList<String>();
@@ -98,6 +113,7 @@ public class MLWeighter implements IWeighter{
         if (externalInput.length>0) pathToCsv = externalInput[0].toString();
 
         String pfPrefix = "Category ";
+        String msPrefix = "Measure ";
         BufferedReader csvReader;
         int lineCount = 0;
         try {
@@ -114,13 +130,14 @@ public class MLWeighter implements IWeighter{
                     lineCount++;
                 }
                 //otherwise, check if the first entry of data is part of the model
-                else if (modelQANames.contains(data[0]) || modelPFNames.contains(getCategoryName(data[0],pfPrefix))) {
+                else if (modelQANames.contains(data[0]) || modelPFNames.contains(getCategoryName(data[0],pfPrefix))
+                        || modelMSNames.contains(getCategoryName(data[0],msPrefix))) {
                     if (lineCount < numQA+1) { //tqi weights, fill values for ahpMat
                         for (int i = 1; i < data.length; i++) {
                             comparisonMat[lineCount-1][i-1] = new BigDecimalWithContext(Double.parseDouble(data[i].trim()));
                         }
                     }
-                    else { //QA weights, fill values for manWeights
+                    else  { //QA weights, fill values for manWeights
                         //parse out the integer for the CWE number and add appropriate prefix, unless it is not numbered
                         pfNames[lineCount-numQA-1] = getCategoryName(data[0],pfPrefix);
                         for (int i = 1; i < data.length; i++) {
@@ -149,6 +166,26 @@ public class MLWeighter implements IWeighter{
 
         //set the weights for edges going into quality aspects based on manual weighting
         manualWeights(qualityModel.getQualityAspects().values(),weights);
+
+        //set the weights for edges using ML
+        try {
+            mlWeights(qualityModel.getQualityAspects().values(),weights);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+//        try {
+//            testWeka();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+
+//        try {
+//            attTest();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+
 
         //set the weights for edges going into tqi based on ahp
         ahpWeights(qualityModel.getTqi(), weights);
@@ -293,4 +330,211 @@ public class MLWeighter implements IWeighter{
         }
     }
 
+
+    /**
+     * Weight edges based on ml decisions from the comparisons
+     * @param nodes nodes to set weights for
+     * @param weights Set to keep track of weights
+     */
+    private void mlWeights(Collection<ModelNode> nodes, Set<WeightResult> weights) throws Exception{
+        BigDecimal[][] normMat = normalizeByColSum(manWeights);
+
+        for (ModelNode node : nodes) {
+            WeightResult weightResult = new WeightResult(node.getName());
+            System.out.println(node.getName());
+
+            var ref = new Object() {
+                int n_measures = 0;
+                int n_projects = 0;
+
+                ArrayList<Attribute> atts;
+                Instances            data;
+                double[]             vals;
+                ArrayList<BigDecimal[]> arrayVals;
+            };
+
+            // 1. set up attributes
+            ref.atts = new ArrayList<Attribute>();
+            ref.arrayVals = new ArrayList<>();
+
+
+            node.getChildren().values().forEach(child ->{
+                    System.out.println(child.getName());
+                    weightResult.setWeight(child.getName(), normMat[ArrayUtils.indexOf(pfNames, child.getName())][ArrayUtils.indexOf(qaNames, node.getName())]);
+
+
+                    child.getChildren().values().forEach( grandChild ->{
+                        System.out.println(grandChild.getName());
+
+                        if (!ref.atts.contains(new Attribute(grandChild.getName()))) {
+                            ref.n_measures += 1;
+                            ref.atts.add(new Attribute(grandChild.getName()));
+
+                            ref.n_projects = grandChild.getThresholds().length;
+
+                            ref.arrayVals.add(grandChild.getThresholds());
+
+                        } else {
+                            System.out.println("***** double present");
+                        }
+                    });
+                }
+            );
+
+            ref.atts.add(new Attribute("Average"));
+            ref.data = new Instances(node.getName(), ref.atts, 0);
+
+            for(int i =0; i<ref.n_projects; i++){
+                ref.vals = new double[ref.n_measures + 1];
+                for (int j = 0; j < ref.n_measures; j++) {
+                    ref.vals[j] = ref.arrayVals.get(j)[i].doubleValue();
+                }
+                int nMeasures = ref.n_measures;
+                ref.vals[ref.n_measures] = Arrays.stream(Arrays.copyOfRange(ref.vals, 0, ref.n_measures)).sum()/ ref.n_measures;
+                ref.data.add(new DenseInstance(1.0, ref.vals));
+            }
+
+            System.out.println(ref.data);
+
+            try {
+                testWeka(ref.data);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+//            weights.add(weightResult);
+        }
+    }
+
+    public static void testWeka(Instances dataset) throws Exception{
+        // load packages and MTJ/arpack libraries (if necessary)
+//        WekaPackageManager.loadPackages(false);
+        //Load Data set
+
+//        DataSource source = new DataSource("/media/kaveen/D/Java_ML/weka-3-8-6/data/regression-datasets/regression-datasets/housing.arff");
+//        Instances dataset = source.getDataSet();
+        //set class index to the last attribute
+        dataset.setClassIndex(dataset.numAttributes()-1);
+
+        //Build model
+//        SimpleLinearRegression model = new SimpleLinearRegression();
+        LinearRegression model = new LinearRegression();
+//        Logistic model = new Logistic();
+        model.buildClassifier(dataset);
+        //output model
+        System.out.println("LR FORMULA : "+model);
+
+        // Saving the model
+        System.out.println("----------saving model---------------");
+        weka.core.SerializationHelper.write("./lin.model",model);
+
+        // loading the model
+        System.out.println("----------loading model---------------");
+        Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./lin.model");
+
+        // Now Predicting the cost
+        Instance myHouse = dataset.lastInstance();
+        double price = loaded_model.classifyInstance(myHouse);
+        System.out.println("-------------------------");
+        System.out.println(myHouse);
+        System.out.println("PREDICTING THE PRICE : "+price);
+    }
+
+    public static void attTest() throws Exception {
+        ArrayList<Attribute> atts;
+        ArrayList<Attribute> attsRel;
+        ArrayList<String>    attVals;
+        ArrayList<String>    attValsRel;
+        Instances            data;
+        Instances            dataRel;
+        double[]             vals;
+        double[]             valsRel;
+        int                  i;
+
+        // 1. set up attributes
+        atts = new ArrayList<Attribute>();
+        // - numeric
+        atts.add(new Attribute("att1"));
+        // - nominal
+        attVals = new ArrayList<String>();
+        for (i = 0; i < 5; i++)
+            attVals.add("val" + (i+1));
+        atts.add(new Attribute("att2", attVals));
+        // - string
+        atts.add(new Attribute("att3", (ArrayList<String>) null));
+        // - date
+        atts.add(new Attribute("att4", "yyyy-MM-dd"));
+        // - relational
+        attsRel = new ArrayList<Attribute>();
+        // -- numeric
+        attsRel.add(new Attribute("att5.1"));
+        // -- nominal
+        attValsRel = new ArrayList<String>();
+        for (i = 0; i < 5; i++)
+            attValsRel.add("val5." + (i+1));
+        attsRel.add(new Attribute("att5.2", attValsRel));
+        dataRel = new Instances("att5", attsRel, 0);
+        atts.add(new Attribute("att5", dataRel, 0));
+
+        // 2. create Instances object
+        data = new Instances("MyRelation", atts, 0);
+
+        // 3. fill with data
+        // first instance
+        vals = new double[data.numAttributes()];
+        // - numeric
+        vals[0] = Math.PI;
+        // - nominal
+        vals[1] = attVals.indexOf("val3");
+        // - string
+        vals[2] = data.attribute(2).addStringValue("This is a string!");
+        // - date
+        vals[3] = data.attribute(3).parseDate("2001-11-09");
+        // - relational
+        dataRel = new Instances(data.attribute(4).relation(), 0);
+        // -- first instance
+        valsRel = new double[2];
+        valsRel[0] = Math.PI + 1;
+        valsRel[1] = attValsRel.indexOf("val5.3");
+        dataRel.add(new DenseInstance(1.0, valsRel));
+        // -- second instance
+        valsRel = new double[2];
+        valsRel[0] = Math.PI + 2;
+        valsRel[1] = attValsRel.indexOf("val5.2");
+        dataRel.add(new DenseInstance(1.0, valsRel));
+        vals[4] = data.attribute(4).addRelation(dataRel);
+        // add
+        data.add(new DenseInstance(1.0, vals));
+
+        // second instance
+        vals = new double[data.numAttributes()];  // important: needs NEW array!
+        // - numeric
+        vals[0] = Math.E;
+        // - nominal
+        vals[1] = attVals.indexOf("val1");
+        // - string
+        vals[2] = data.attribute(2).addStringValue("And another one!");
+        // - date
+        vals[3] = data.attribute(3).parseDate("2000-12-01");
+        // - relational
+        dataRel = new Instances(data.attribute(4).relation(), 0);
+        // -- first instance
+        valsRel = new double[2];
+        valsRel[0] = Math.E + 1;
+        valsRel[1] = attValsRel.indexOf("val5.4");
+        dataRel.add(new DenseInstance(1.0, valsRel));
+        // -- second instance
+        valsRel = new double[2];
+        valsRel[0] = Math.E + 2;
+        valsRel[1] = attValsRel.indexOf("val5.1");
+        dataRel.add(new DenseInstance(1.0, valsRel));
+        vals[4] = data.attribute(4).addRelation(dataRel);
+        // add
+        data.add(new DenseInstance(1.0, vals));
+
+        // 4. output data
+        System.out.println(data);
+    }
+
 }
+
