@@ -23,11 +23,12 @@ public class MLWeighterTests {
 
     @Test
     public void SimpleMLWeighterTest() {
-        String pathToCsv = "./src/test/resources/comparisons.csv";
+//        String pathToCsv = "./src/test/resources/comparisons.csv";
 
         Properties prop = PiqueTestProperties_afterBenchmarker.getProperties();
 
         Path blankqmFilePath = Paths.get(prop.getProperty("blankqm.filepath"));
+        String pathToCsv = prop.getProperty("benchmark.pathToCSV");
 
         QualityModelImport qmImport = new QualityModelImport(blankqmFilePath);
         QualityModel qmDescription = qmImport.importQualityModel();
