@@ -43,22 +43,16 @@ import pique.utility.BigDecimalWithContext;
 import pique.evaluation.ProbabilityDensityFunctionUtilityFunction;
 
 
-import weka.core.Utils;
+import weka.core.*;
 import weka.classifiers.Classifier;
-import weka.core.Instance;
-import weka.core.Instances;
 import weka.core.converters.ConverterUtils.DataSource;
 import weka.core.converters.CSVSaver;
 import weka.classifiers.functions.LinearRegression;
 import weka.classifiers.functions.SimpleLinearRegression;
 import weka.classifiers.functions.Logistic;
-import weka.core.WekaPackageManager;
 import weka.filters.Filter;
 import weka.filters.unsupervised.instance.RemovePercentage;
 import weka.filters.supervised.instance.StratifiedRemoveFolds;
-
-import weka.core.Attribute;
-import weka.core.DenseInstance;
 
 import java.util.ArrayList;
 
@@ -74,13 +68,13 @@ import static java.lang.Long.sum;
 public class MLWeighter implements IWeighter{
     private String[] qaNames;
     private String[] pfNames;
-    private String[] msNames;
+    public String[] msNames;
     private BigDecimalWithContext[][] manWeights;
     private BigDecimalWithContext[][] comparisonMat;
     private BigDecimalWithContext[][] measMat;
     private int numQA;
     private int numPF;
-    private int numMS;
+    public int numMS;
 
 
     /**
@@ -138,17 +132,22 @@ public class MLWeighter implements IWeighter{
                 }
                 //otherwise, check if the first entry of data is part of the model
                 else if (modelQANames.contains(data[0]) || modelPFNames.contains(getCategoryName(data[0],pfPrefix))
-                        || modelMSNames.contains(getCategoryName(data[0],msPrefix))) {
+                        || modelMSNames.contains(data[0])) {
                     if (lineCount < numQA+1) { //tqi weights, fill values for ahpMat
                         for (int i = 1; i < data.length; i++) {
                             comparisonMat[lineCount-1][i-1] = new BigDecimalWithContext(Double.parseDouble(data[i].trim()));
                         }
                     }
-                    else  { //QA weights, fill values for manWeights
+                    else if (lineCount < numQA+numPF+1)  { //QA weights, fill values for manWeights
                         //parse out the integer for the CWE number and add appropriate prefix, unless it is not numbered
                         pfNames[lineCount-numQA-1] = getCategoryName(data[0],pfPrefix);
                         for (int i = 1; i < data.length; i++) {
-                            manWeights[lineCount-numQA-1][i-1] = new BigDecimalWithContext(Double.parseDouble(data[i].trim()));
+                            manWeights[lineCount - numQA - 1][i - 1] = new BigDecimalWithContext(Double.parseDouble(data[i].trim()));
+                        }
+                    } else {
+                        msNames[lineCount-numQA-numPF-1] = data[0];
+                        for (int i = 1; i < data.length; i++) {
+                            measMat[lineCount - numQA - numPF - 1][i - 1] = new BigDecimalWithContext(Double.parseDouble(data[i].trim()));
                         }
                     }
                     lineCount++;
@@ -176,7 +175,7 @@ public class MLWeighter implements IWeighter{
 
         //set the weights for edges using ML
         try {
-            mlWeights(qualityModel.getQualityAspects().values(),weights);
+            mlWeights(qualityModel.getQualityAspects().values(),weights, measMat);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -226,6 +225,24 @@ public class MLWeighter implements IWeighter{
             return pfPrefix + "CWE-" + Integer.toString(Integer.parseInt(name.replaceAll("[\\D]", "")));
         }
     }
+
+    /**
+     * This class will take a name and prefix and add the prefix to the name, as well as "CWE-". This is to convert the node name from the comparison
+     * file to the specific strings that are used in the quality model as of right now. This could easily break if the file or quality model changes.
+     * @param name The name of the model node as given in the comparison file.
+     * @param msPrefix The common prefix for all categories
+     * @return The Category in the model based upon the given name.
+     */
+    private String getMeasureName(String name, String msPrefix) {
+        if (name.replaceAll("[\\D]", "").length() == 0) {
+            //no numbers in the name
+            return msPrefix +name;
+        }
+        else {
+            return msPrefix + "CWE-" + Integer.toString(Integer.parseInt(name.replaceAll("[\\D]", "")));
+        }
+    }
+
 
     /**
      * Sets the incoming weights for a node to evaluate the average value of children.
@@ -320,6 +337,19 @@ public class MLWeighter implements IWeighter{
         return (sumCol);
     }
 
+    /***
+     * Add an element to a BigDecimal array
+     * @param array
+     * @param newElement
+     * @return
+     */
+    private static BigDecimal[] addToArray(BigDecimal[] array, BigDecimal newElement) {
+        BigDecimal[] newArray = Arrays.copyOf(array, array.length + 1);
+        newArray[newArray.length - 1] = newElement;
+        return newArray;
+    }
+
+
     /**
      * Weight edges based on manual decisions from the comparisons
      * @param nodes nodes to set weights for
@@ -342,32 +372,122 @@ public class MLWeighter implements IWeighter{
      * Weight edges based on ml decisions from the comparisons
      * @param nodes nodes to set weights for
      * @param weights Set to keep track of weights
+     * @param measMat
      */
-    private void mlWeights(Collection<ModelNode> nodes, Set<WeightResult> weights) throws Exception{
-        BigDecimal[][] normMat = normalizeByColSum(manWeights);
-        ProbabilityDensityFunctionUtilityFunction probabilityDensityFunctionUtilityFunction;
-        probabilityDensityFunctionUtilityFunction = new ProbabilityDensityFunctionUtilityFunction();
+    private void mlWeights(Collection<ModelNode> nodes, Set<WeightResult> weights, BigDecimal[][] measMat) throws Exception{
+
+        boolean PriorityCsv = false;
 
         for (ModelNode node : nodes) {
             WeightResult weightResult = new WeightResult(node.getName());
             System.out.println(node.getName());
 
-            var ref = new Object() {
-                int n_measures = 0;
-                int n_projects = 0;
-
-                ArrayList<Attribute> atts;
-                Instances            data;
-                double[]             vals;
-                ArrayList<BigDecimal[]> arrayVals;
-            };
-
-            // 1. set up attributes
-            ref.atts = new ArrayList<Attribute>();
-            ref.arrayVals = new ArrayList<>();
+            Instances data = null;
+            try{
+                if (PriorityCsv) {
+                    data = dataFromCsv(node, measMat);
+                }else {
+                    data = dataFromStructure(node);
+                }
+            } catch (Exception e){
+                e.printStackTrace();
+            }
 
 
-            node.getChildren().values().forEach(child ->{
+
+
+//            System.out.println(data);
+
+            // Saving the dataset
+            CSVSaver saver = new CSVSaver();
+            saver.setInstances(data);
+            saver.setFile(new File("./src/test/out/ML/"+ node.getName()+"_measures.csv"));
+            saver.setDestination(new File("./src/test/out/ML/"+ node.getName()+"_measures.csv"));
+            saver.writeBatch();
+
+
+            try {
+                assert data != null;
+                LinearRegression model = testWeka(data);
+                // Saving the model
+                System.out.println("----------saving model---------------");
+                SerializationHelper.write("./src/test/out/ML/"+node.getName()+"_lin.model",model);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+//            weights.add(weightResult);
+        }
+    }
+
+
+    public Instances dataFromCsv(ModelNode node, BigDecimal[][] measMat) throws Exception{
+        ProbabilityDensityFunctionUtilityFunction probabilityDensityFunctionUtilityFunction;
+        probabilityDensityFunctionUtilityFunction = new ProbabilityDensityFunctionUtilityFunction();
+
+        var ref = new Object() {
+            int n_measures = 0;
+            int n_projects = 0;
+
+            ArrayList<Attribute> atts;
+            Instances            data;
+            double[]             vals;
+            ArrayList<BigDecimal[]> arrayVals;
+        };
+
+        // 1. set up attributes
+        ref.atts = new ArrayList<Attribute>();
+        ref.arrayVals = new ArrayList<>();
+
+        List<String> msNameList = Arrays.asList(this.msNames);
+        List<String> qaNameList = Arrays.asList(this.qaNames);
+        int qaIndex = qaNameList.indexOf(node.getName());
+
+        for(int i =0; i< this.numMS; i++ ){
+            System.out.println(msNameList.get(i));
+            System.out.println(measMat[i][qaIndex]);
+            boolean a = (measMat[i][qaIndex] != null);
+            boolean b = (measMat[i][qaIndex].compareTo(new BigDecimalWithContext(0.0)) !=0);
+
+            if (a && b) {
+                ref.atts.add(new Attribute(msNameList.get(i)));
+
+
+
+
+            }
+
+
+
+        }
+
+        ref.atts.add(new Attribute("Average"));
+        ref.data = new Instances(node.getName(), ref.atts, 0);
+
+
+        System.out.println(ref.data);
+        return ref.data;
+    }
+
+    public static Instances dataFromStructure(ModelNode node) throws Exception {
+        ProbabilityDensityFunctionUtilityFunction probabilityDensityFunctionUtilityFunction;
+        probabilityDensityFunctionUtilityFunction = new ProbabilityDensityFunctionUtilityFunction();
+
+        var ref = new Object() {
+            int n_measures = 0;
+            int n_projects = 0;
+
+            ArrayList<Attribute> atts;
+            Instances            data;
+            double[]             vals;
+            ArrayList<BigDecimal[]> arrayVals;
+        };
+
+        // 1. set up attributes
+        ref.atts = new ArrayList<Attribute>();
+        ref.arrayVals = new ArrayList<>();
+
+        node.getChildren().values().forEach(child ->{
                     System.out.println(child.getName());
 //                    weightResult.setWeight(child.getName(), normMat[ArrayUtils.indexOf(pfNames, child.getName())][ArrayUtils.indexOf(qaNames, node.getName())]);
 
@@ -399,54 +519,26 @@ public class MLWeighter implements IWeighter{
                         }
                     });
                 }
-            );
+        );
 
-            ref.atts.add(new Attribute("Average"));
-            ref.data = new Instances(node.getName(), ref.atts, 0);
+        ref.atts.add(new Attribute("Average"));
+        ref.data = new Instances(node.getName(), ref.atts, 0);
 
-            for(int i =0; i<ref.n_projects; i++){
-                ref.vals = new double[ref.n_measures + 1];
-                for (int j = 0; j < ref.n_measures; j++) {
-                    ref.vals[j] = ref.arrayVals.get(j)[i].doubleValue();
-                }
-                int nMeasures = ref.n_measures;
-                ref.vals[ref.n_measures] = Arrays.stream(Arrays.copyOfRange(ref.vals, 0, ref.n_measures)).sum()/ ref.n_measures;
-                ref.data.add(new DenseInstance(1.0, ref.vals));
+        for(int i =0; i<ref.n_projects; i++){
+            ref.vals = new double[ref.n_measures + 1];
+            for (int j = 0; j < ref.n_measures; j++) {
+                ref.vals[j] = ref.arrayVals.get(j)[i].doubleValue();
             }
-
-//            System.out.println(ref.data);
-
-            // Saving the dataset
-            CSVSaver saver = new CSVSaver();
-            saver.setInstances(ref.data);
-            saver.setFile(new File("./src/test/out/ML/"+ node.getName()+"_measures.csv"));
-            saver.setDestination(new File("./src/test/out/ML/"+ node.getName()+"_measures.csv"));
-            saver.writeBatch();
-
-
-            try {
-                LinearRegression model = testWeka(ref.data);
-//                node.setThresholds(model);
-                // Saving the model
-                System.out.println("----------saving model---------------");
-                weka.core.SerializationHelper.write("./src/test/out/ML/"+node.getName()+"_lin.model",model);
-
-
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-
-
-//            weights.add(weightResult);
+            int nMeasures = ref.n_measures;
+            ref.vals[ref.n_measures] = Arrays.stream(Arrays.copyOfRange(ref.vals, 0, ref.n_measures)).sum()/ ref.n_measures;
+            ref.data.add(new DenseInstance(1.0, ref.vals));
         }
+
+        return ref.data;
     }
 
-    private static BigDecimal[] addToArray(BigDecimal[] array, BigDecimal newElement) {
-        BigDecimal[] newArray = Arrays.copyOf(array, array.length + 1);
-        newArray[newArray.length - 1] = newElement;
-        return newArray;
-    }
+
+
 
     public static LinearRegression testWeka(Instances dataset) throws Exception{
         //Load Data set
