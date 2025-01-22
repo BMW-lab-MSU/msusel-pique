@@ -1,0 +1,8 @@
+﻿﻿Criteria,Confidentiality,Integrity
+Confidentiality,1,0.5
+Integrity,2,1
+CWE (123),0,1
+CWE (234),1,1
+Yara email Measure, 1,0
+CWE-123 Measure, 0,1
+CWE-321 Measure, 0,1

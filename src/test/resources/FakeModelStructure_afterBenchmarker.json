@@ -35,15 +35,15 @@
         "eval_strategy" : "pique.evaluation.DefaultProductFactorEvaluator",
         "children" : {
           "Yara email Measure" : {},
-          "CVE-CWE-123 Measure" : { }
+          "CWE-321 Measure" : { }
         }
       },
       "Category CWE-123" : {
         "description" : "",
         "eval_strategy" : "pique.evaluation.DefaultProductFactorEvaluator",
         "children" : {
-          "CWE-123 Weakness Measure" : { },
-          "CVE-CWE-123 Measure" : { }
+          "CWE-123 Measure" : { },
+          "CWE-321 Measure" : { }
         }
       }
     }
@@ -263,12 +263,12 @@
         0
       ]
     },
-    "CVE-CWE-123 Measure" : {
+    "CWE-321 Measure" : {
       "positive" : false,
       "utility_function" : "pique.evaluation.DefaultUtility",
       "description" : "",
       "children" : {
-        "CVE-CWE-123 Diagnostic" : { }
+        "CWE-321 Diagnostic" : { }
       },
       "thresholds": [
         200,
@@ -477,12 +477,12 @@
         78
       ]
     },
-    "CWE-123 Weakness Measure" : {
+    "CWE-123 Measure" : {
       "positive" : false,
       "utility_function" : "pique.evaluation.DefaultUtility",
       "description" : "",
       "children" : {
-        "CWE-123 Weakness Diagnostic" : { }
+        "CWE-123 Diagnostic" : { }
       },
       "thresholds": [
         200,
@@ -693,11 +693,11 @@
     }
   },
   "diagnostics" : {
-    "CWE-123 Weakness Diagnostic" : {
+    "CWE-123 Diagnostic" : {
       "description" : "",
       "toolName" : "testTool"
     },
-    "CVE-CWE-123 Diagnostic" : {
+    "CWE-321 Diagnostic" : {
       "description" : "",
       "toolName" : "testTool"
     },
