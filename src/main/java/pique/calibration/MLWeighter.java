@@ -408,7 +408,7 @@ public class MLWeighter implements IWeighter{
 
             try {
                 assert data != null;
-                LinearRegression model = testWeka(data);
+                Classifier model = testWeka(data);
                 // Saving the model
                 System.out.println("----------saving model---------------");
                 SerializationHelper.write("./src/test/out/ML/"+node.getName()+"_lin.model",model);
@@ -418,6 +418,13 @@ public class MLWeighter implements IWeighter{
 
 //            weights.add(weightResult);
         }
+    }
+
+    public Instances removeConstantData(Instances data){
+        Instances newData = new Instances(data);
+
+
+        return newData;
     }
 
 
@@ -468,6 +475,7 @@ public class MLWeighter implements IWeighter{
         System.out.println(ref.data);
         return ref.data;
     }
+
 
     public static Instances dataFromStructure(ModelNode node) throws Exception {
         ProbabilityDensityFunctionUtilityFunction probabilityDensityFunctionUtilityFunction;
@@ -537,10 +545,40 @@ public class MLWeighter implements IWeighter{
         return ref.data;
     }
 
+    /**
+     * Makes the predicting values to monotonically increase in each cardinal direction
+     * @param inValues
+     * @param model
+     * @return
+     */
+    public static double postProcessInstance(Instance inValues, Classifier model) {
+        int n_attributes = inValues.numAttributes();
+        double newScore = 0.0;
+
+        try{
+            newScore = model.classifyInstance(inValues);
+
+            for (int i = 0; i < n_attributes; i++) {
+                double att_value = inValues.value(i);
+                Instance newInValues = inValues;
+
+                for (double j = 0; j <= att_value; j=j+0.1) {
+                    newInValues.setValue(i,j);
+                    newScore = Math.max(newScore, model.classifyInstance(newInValues));
+
+                }
+
+            }
+
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+
+        return newScore;
+    }
 
 
-
-    public static LinearRegression testWeka(Instances dataset) throws Exception{
+    public static Classifier testWeka(Instances dataset) throws Exception{
         //Load Data set
 
 //        DataSource source = new DataSource("/PWD/weka-3-8-6/data/regression-datasets/regression-datasets/housing.arff");
@@ -605,24 +643,30 @@ public class MLWeighter implements IWeighter{
         //output model
         System.out.println("LR FORMULA : "+model);
 
-//        // Saving the model
-//        System.out.println("----------saving model---------------");
-//        weka.core.SerializationHelper.write("./lin.model",model);
-//
-//        // loading the model
-//        System.out.println("----------loading model---------------");
-//        Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./lin.model");
-//
-//        // Now Predicting the cost
-//        Instance myHouse = test.lastInstance();
-//        double price = loaded_model.classifyInstance(myHouse);
-//        System.out.println("-------------------------");
-//        System.out.println(myHouse);
-//        System.out.println("PREDICTING THE score : "+price);
+        // Saving the model
+        System.out.println("----------saving model---------------");
+        weka.core.SerializationHelper.write("./lin.model",model);
+
+        // loading the model
+        System.out.println("----------loading model---------------");
+        Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./lin.model");
+
+        // Now Predicting the cost
+        Instance sampleInstance = test.lastInstance();
+        double price = loaded_model.classifyInstance(sampleInstance);
+        System.out.println("-------------------------");
+        System.out.println(sampleInstance);
+        System.out.println("PREDICTING THE SCORE : "+price);
+
+        System.out.println("---------Post Processing----------------");
+        double newScore =  0;
+        newScore = postProcessInstance(sampleInstance, loaded_model);
+        System.out.println("Post processing" +  newScore);
 
 
 
-        return model;
+
+        return (Classifier) model;
     }
 
 //    public static void attTest() throws Exception {
