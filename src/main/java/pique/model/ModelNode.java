@@ -23,7 +23,6 @@
 package pique.model;
 
 import com.google.gson.annotations.Expose;
-import jdk.jshell.Diag;
 import lombok.Getter;
 import lombok.Setter;
 import pique.evaluation.*;
@@ -50,6 +49,10 @@ public abstract class ModelNode {
     //  String name matching (not enough time for me to solve currently)
     @Getter @Expose
     protected Map<String, ModelNode> children = new HashMap<>();
+
+    @Getter @Expose
+    protected Map<String, ModelNode> indirectChildren = new HashMap<>();
+
     @Getter @Setter @Expose
     protected Map<String, BigDecimal> weights = new HashMap<>();
     @Getter @Setter @Expose
@@ -131,6 +134,25 @@ public abstract class ModelNode {
         eval_strategy = eval_strategyObj.getName();
         normalizer = normalizerObj.getName();
     }
+
+    public ModelNode(BigDecimal value, String name, String description, IEvaluator eval_strategyObj, INormalizer normalizerObj,
+                     IUtilityFunction utility_function, Map<String, BigDecimal> weights, BigDecimal[] thresholds, Map<String,
+                    ModelNode> children, Map<String, ModelNode> indirectChildren) {
+        this.value = value;
+        this.name = name;
+        this.description = description;
+        this.eval_strategyObj = eval_strategyObj;
+        this.normalizerObj = normalizerObj;
+        this.utility_function = utility_function;
+        this.weights = weights;
+        this.thresholds = thresholds;
+        this.children = children;
+        this.indirectChildren = indirectChildren;
+
+        // remove me once we get vis schema working
+        eval_strategy = eval_strategyObj.getName();
+        normalizer = normalizerObj.getName();
+    }
     //endregion
 
     //region Getters and setters
@@ -162,6 +184,29 @@ public abstract class ModelNode {
     }
 
     public int getNumChildren() { return getChildren().size(); }
+
+    // For Indirect children field
+    // TODO: Verify functionality
+    public ModelNode getAnyIndirectChild() {
+        ModelNode anyModelNode = getIndirectChildren().values().stream().findAny().orElse(null);
+        assert anyModelNode != null;
+        return anyModelNode;
+    }
+
+    public ModelNode getIndirectChild(String name) {return getIndirectChildren().get(name); }
+
+    public void setIndirectChild(ModelNode indirectChild) {
+        getIndirectChildren().put(indirectChild.getName(), indirectChild);
+    }
+
+    public void setIndirectChildren(Collection<ModelNode> indirectChildren) {
+        indirectChildren.forEach(element -> getIndirectChildren().putIfAbsent(element.getName(), element));
+    }
+
+    public int getNumIndirectChildren() {return getIndirectChildren().size();}
+
+    //
+
 
     public BigDecimal getValue() {
         evaluate();

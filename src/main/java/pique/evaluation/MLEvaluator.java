@@ -19,6 +19,7 @@ public class MLEvaluator extends Evaluator {
 
 
 
+
         // Apply weighted sums
         for (ModelNode child : inNode.getChildren().values()) {
             outValue = outValue.add(child.getValue().multiply(inNode.getWeight(child.getName()),BigDecimalWithContext.getMC()));

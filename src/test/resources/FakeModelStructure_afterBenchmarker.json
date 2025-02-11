@@ -18,6 +18,9 @@
         "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator",
         "children" : {
           "Category CWE-234" : {}
+        },
+        "indirectChildren": {
+          "Yara email Measure": {}
         }
       },
       "Integrity" : {
@@ -26,6 +29,10 @@
         "children" : {
           "Category CWE-234" : {},
           "Category CWE-123" : {}
+        },
+        "indirectChildren": {
+          "CWE-321 Measure" : {},
+          "CWE-123 Measure" : {}
         }
       }
     },

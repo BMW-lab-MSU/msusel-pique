@@ -266,6 +266,8 @@ public class QualityModelImport {
         }
     }
 
+
+
     protected IUtilityFunction getUtilityFunctionFromConfiguration(JsonObject jsonQmNode) {
         if (jsonQmNode.get("utility_function") != null) {
             String fullClassName = "";
@@ -307,6 +309,21 @@ public class QualityModelImport {
             return null;
         }
     }
+
+    protected Map<String, ModelNode> getIndirectChildrenFromConfiguration(JsonObject jsonQmNode) {
+        if (jsonQmNode.get("indirectChildren") != null) {
+            Map<String, ModelNode> indirectChildrenNames = new HashMap<>();
+            JsonObject jsonIndirectChildren = jsonQmNode.getAsJsonObject("indirectChildren");
+            jsonIndirectChildren.entrySet().forEach(jsonIndirectChildrenEntry -> {
+                indirectChildrenNames.put(jsonIndirectChildrenEntry.getKey(), null);
+            });
+
+            return indirectChildrenNames;
+        } else {
+            return null;
+        }
+    }
+
 
     /**
      * Check for 'glocal_config' -> 'benchmark_strategy' and return the benchmark strategy class listed.
@@ -500,6 +517,8 @@ public class QualityModelImport {
             IUtilityFunction utilityFunction = getUtilityFunctionFromConfiguration(valueObj);
             Map<String, BigDecimal> weights = getWeightsFromConfiguration(valueObj);
             BigDecimal[] thresholds = getThresholdsFromConfiguration(valueObj);
+            Map<String, ModelNode> indirectChildren = getIndirectChildrenFromConfiguration(valueObj);
+
 
             // Instance the quality aspect
             QualityAspect qa = new QualityAspect(qaName, qaDescription, evaluator, normalizer, utilityFunction,

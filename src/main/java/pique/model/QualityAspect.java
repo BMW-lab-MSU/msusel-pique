@@ -47,6 +47,14 @@ public class QualityAspect extends ModelNode {
         super(name, description, evaluator, normalizer, utilityFunction, weights, thresholds);
     }
 
+    public QualityAspect(String name, String description, IEvaluator evaluator, INormalizer normalizer,
+                         IUtilityFunction utilityFunction, Map<String, BigDecimal> weights, BigDecimal[] thresholds,
+                         Map<String, ModelNode> indirectChildren) {
+        super(name, description, evaluator, normalizer, utilityFunction, weights, thresholds);
+
+        this.indirectChildren = indirectChildren;
+    }
+
     public QualityAspect(String name, String description, Map<String, BigDecimal> weights) {
         super(name, description, new DefaultFactorEvaluator(), new DefaultNormalizer());
         this.weights = weights;

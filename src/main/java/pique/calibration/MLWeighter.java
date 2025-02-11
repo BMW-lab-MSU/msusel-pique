@@ -376,7 +376,10 @@ public class MLWeighter implements IWeighter{
      */
     private void mlWeights(Collection<ModelNode> nodes, Set<WeightResult> weights, BigDecimal[][] measMat) throws Exception{
 
-        boolean PriorityCsv = false;
+        //Data source priority
+        // TODO: read this parameter from properties
+//        String priority = "CSV";
+        String priority = "IndirectChildren";
 
         for (ModelNode node : nodes) {
             WeightResult weightResult = new WeightResult(node.getName());
@@ -384,11 +387,16 @@ public class MLWeighter implements IWeighter{
 
             Instances data = null;
             try{
-                if (PriorityCsv) {
+                if (priority.equals("CSV")) {
                     data = dataFromCsv(node, measMat);
-                }else {
+                }else if (priority.equals("Children")) {
                     data = dataFromStructure(node);
+                }else if (priority.equals("IndirectChildren")) {
+                    data = dataFromIndirectStructure(node);
+                }else {
+                    System.out.println("Unknown priority source :" + priority);
                 }
+
             } catch (Exception e){
                 e.printStackTrace();
             }
@@ -418,13 +426,6 @@ public class MLWeighter implements IWeighter{
 
 //            weights.add(weightResult);
         }
-    }
-
-    public Instances removeConstantData(Instances data){
-        Instances newData = new Instances(data);
-
-
-        return newData;
     }
 
 
@@ -458,19 +459,11 @@ public class MLWeighter implements IWeighter{
 
             if (a && b) {
                 ref.atts.add(new Attribute(msNameList.get(i)));
-
-
-
-
             }
-
-
-
         }
 
         ref.atts.add(new Attribute("Average"));
         ref.data = new Instances(node.getName(), ref.atts, 0);
-
 
         System.out.println(ref.data);
         return ref.data;
@@ -529,8 +522,11 @@ public class MLWeighter implements IWeighter{
                 }
         );
 
+
+        // FIXME: Have to do average separately outside of this loop
         ref.atts.add(new Attribute("Average"));
         ref.data = new Instances(node.getName(), ref.atts, 0);
+
 
         for(int i =0; i<ref.n_projects; i++){
             ref.vals = new double[ref.n_measures + 1];
@@ -545,41 +541,102 @@ public class MLWeighter implements IWeighter{
         return ref.data;
     }
 
+
+    public static Instances dataFromIndirectStructure(ModelNode node) throws Exception {
+        ProbabilityDensityFunctionUtilityFunction probabilityDensityFunctionUtilityFunction;
+        probabilityDensityFunctionUtilityFunction = new ProbabilityDensityFunctionUtilityFunction();
+
+        var ref = new Object() {
+            int n_measures = 0;
+            int n_projects = 0;
+
+            ArrayList<Attribute> atts;
+            Instances            data;
+            double[]             vals;
+            ArrayList<BigDecimal[]> arrayVals;
+        };
+
+        // 1. set up attributes
+        ref.atts = new ArrayList<Attribute>();
+        ref.arrayVals = new ArrayList<>();
+
+
+        node.getIndirectChildren().values().forEach(child ->{
+            System.out.println(child.getName());
+
+
+
+        });
+
+
+
+
+        return ref.data;
+    }
+
+
+
+
     /**
      * Makes the predicting values to monotonically increase in each cardinal direction
      * @param inValues
      * @param model
      * @return
      */
-    public static double postProcessInstance(Instance inValues, Classifier model) {
+    public static double postProcessInstance(Instance inValues, Classifier model) throws Exception {
         int n_attributes = inValues.numAttributes();
         double newScore = 0.0;
 
-        try{
-            newScore = model.classifyInstance(inValues);
+        newScore = model.classifyInstance(inValues);
 
-            for (int i = 0; i < n_attributes; i++) {
-                double att_value = inValues.value(i);
-                Instance newInValues = inValues;
-
-                for (double j = 0; j <= att_value; j=j+0.1) {
-                    newInValues.setValue(i,j);
-                    newScore = Math.max(newScore, model.classifyInstance(newInValues));
-
-                }
+        for (int i = 0; i < n_attributes; i++) {
+            double att_value = inValues.value(i);
+            Instance newInValues = inValues;
+            for (double j = 0; j <= att_value; j=j+0.1) {
+                newInValues.setValue(i,j);
+                newScore = Math.max(newScore, model.classifyInstance(newInValues));
 
             }
-
-        }catch (Exception e){
-            e.printStackTrace();
         }
-
         return newScore;
     }
 
+    /**
+     * Removes constatnt columns from  data
+     * @param data
+     * @return
+     *
+     */
+
+    public static Instances removeConstantAttributes(Instances data){
+        Instances newData = new Instances(data);
+
+        int numAttributes = newData.numAttributes();
+        List<Attribute> atts = new ArrayList<>();
+
+        for (int i = 0; i < numAttributes; i++) {
+            Attribute att_name = data.attribute(i);
+            System.out.println(att_name);
+
+            int num_unique = data.numDistinctValues(att_name);
+
+            if (num_unique <=1) {
+                newData.deleteAttributeAt(i);
+            }
+
+        }
+
+
+        return newData;
+    }
 
     public static Classifier testWeka(Instances dataset) throws Exception{
         //Load Data set
+
+        System.out.println("Cleaned data");
+        Instances cleanedData = new Instances(removeConstantAttributes(dataset));
+        System.out.println(cleanedData);
+
 
 //        DataSource source = new DataSource("/PWD/weka-3-8-6/data/regression-datasets/regression-datasets/housing.arff");
 //        Instances dataset = source.getDataSet();
@@ -662,9 +719,6 @@ public class MLWeighter implements IWeighter{
         double newScore =  0;
         newScore = postProcessInstance(sampleInstance, loaded_model);
         System.out.println("Post processing" +  newScore);
-
-
-
 
         return (Classifier) model;
     }
