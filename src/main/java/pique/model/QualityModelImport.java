@@ -200,6 +200,15 @@ public class QualityModelImport {
                     throw new RuntimeException("nodeType did not match a support enum.");
             }
         }
+        if ( targetNodeValues.get("indirectChildren") != null) {
+            List<String> childrenNames = new ArrayList<>();
+
+            JsonObject children = targetNodeValues.get("indirectChildren").getAsJsonObject();
+            children.entrySet().forEach(childJsonElement -> childrenNames.add(childJsonElement.getKey()));
+
+            ModelNode rootNode = allModelNodes.get(targetNodeName);
+            childrenNames.forEach(name -> rootNode.setIndirectChild(allModelNodes.get(name)));
+        }
     }
 
     protected IEvaluator getEvaluatorFromConfiguration(JsonObject jsonQmNode, String nodeTypeQm) {
