@@ -564,11 +564,44 @@ public class MLWeighter implements IWeighter{
         node.getIndirectChildren().values().forEach(child ->{
             System.out.println(child.getName());
 
+            if (!ref.atts.contains(new Attribute(child.getName()))) {
+                ref.n_measures += 1;
+                ref.atts.add(new Attribute(child.getName()));
 
+                BigDecimal[] thresholds = child.getThresholds();
+
+                ref.n_projects = thresholds.length;
+
+                BigDecimal[] scores = new BigDecimal[0];
+
+                // Generating PDF scores for the thresholds
+                for(int i=0; i<ref.n_projects; i++){
+                    BigDecimal inValue = thresholds[i];
+                    BigDecimal score = probabilityDensityFunctionUtilityFunction.utilityFunction(inValue, thresholds, false);
+                    scores = addToArray(scores, score);
+                }
+
+                ref.arrayVals.add(scores);
+
+            } else {
+                System.out.println("***** double present");
+            }
 
         });
 
+        ref.atts.add(new Attribute("Average"));
+        ref.data = new Instances(node.getName(), ref.atts, 0);
 
+
+        for(int i =0; i<ref.n_projects; i++){
+            ref.vals = new double[ref.n_measures + 1];
+            for (int j = 0; j < ref.n_measures; j++) {
+                ref.vals[j] = ref.arrayVals.get(j)[i].doubleValue();
+            }
+            int nMeasures = ref.n_measures;
+            ref.vals[ref.n_measures] = Arrays.stream(Arrays.copyOfRange(ref.vals, 0, ref.n_measures)).sum()/ ref.n_measures;
+            ref.data.add(new DenseInstance(1.0, ref.vals));
+        }
 
 
         return ref.data;
