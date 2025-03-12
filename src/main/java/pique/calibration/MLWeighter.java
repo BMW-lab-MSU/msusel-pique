@@ -40,6 +40,7 @@ import pique.calibration.WeightResult;
 import pique.model.ModelNode;
 import pique.model.QualityModel;
 import pique.utility.BigDecimalWithContext;
+import pique.utility.PiqueProperties;
 import pique.evaluation.ProbabilityDensityFunctionUtilityFunction;
 
 
@@ -50,6 +51,7 @@ import weka.core.converters.CSVSaver;
 import weka.classifiers.functions.LinearRegression;
 import weka.classifiers.functions.SimpleLinearRegression;
 import weka.classifiers.functions.MultilayerPerceptron;
+import weka.classifiers.trees.RandomForest;
 import weka.filters.Filter;
 import weka.filters.unsupervised.instance.RemovePercentage;
 import weka.filters.supervised.instance.StratifiedRemoveFolds;
@@ -88,6 +90,8 @@ public class MLWeighter implements IWeighter{
      */
     @Override
     public Set<WeightResult> elicitateWeights(QualityModel qualityModel, Path... externalInput) {
+        Properties prop = PiqueProperties.getProperties();
+
         numQA = qualityModel.getQualityAspects().size();
         numPF = qualityModel.getProductFactors().size();
         numMS = qualityModel.getMeasures().size();
@@ -732,7 +736,8 @@ public class MLWeighter implements IWeighter{
         //Build model
 //        SimpleLinearRegression model = new SimpleLinearRegression();
 //        LinearRegression model = new LinearRegression();
-        MultilayerPerceptron model = new MultilayerPerceptron();
+//        MultilayerPerceptron model = new MultilayerPerceptron();
+        RandomForest model= new RandomForest();
 
         model.buildClassifier(train);
         //output model
