@@ -15,7 +15,7 @@
     "quality_aspects" : {
       "Confidentiality" : {
         "description" : "Information is not made available or disclosed to unauthorized individuals, entities, or processes.",
-        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator",
+        "eval_strategy" : "pique.evaluation.MLEvaluator",
         "children" : {
           "Category CWE-234" : {}
         },
@@ -25,7 +25,7 @@
       },
       "Integrity" : {
         "description" : "Data or processes cannot be modified in an unauthorized way.",
-        "eval_strategy" : "pique.evaluation.DefaultFactorEvaluator",
+        "eval_strategy" : "pique.evaluation.MLEvaluator",
         "children" : {
           "Category CWE-234" : {},
           "Category CWE-123" : {}

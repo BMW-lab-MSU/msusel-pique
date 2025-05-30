@@ -347,7 +347,7 @@ public class MLWeighter implements IWeighter{
      * @param newElement
      * @return
      */
-    private static BigDecimal[] addToArray(BigDecimal[] array, BigDecimal newElement) {
+    public static BigDecimal[] addToArray(BigDecimal[] array, BigDecimal newElement) {
         BigDecimal[] newArray = Arrays.copyOf(array, array.length + 1);
         newArray[newArray.length - 1] = newElement;
         return newArray;
@@ -414,6 +414,8 @@ public class MLWeighter implements IWeighter{
 //            System.out.println(data);
 
             // Saving the dataset
+//            String pathtToML = prop.
+
             CSVSaver saver = new CSVSaver();
             saver.setInstances(data);
             saver.setFile(new File("./src/test/out/ML/"+ node.getName()+"_measures.csv"));
@@ -753,10 +755,10 @@ public class MLWeighter implements IWeighter{
 
         // Now Predicting the cost
         Instance sampleInstance = test.lastInstance();
-        double price = loaded_model.classifyInstance(sampleInstance);
+        double prediction = loaded_model.classifyInstance(sampleInstance);
         System.out.println("-------------------------");
         System.out.println(sampleInstance);
-        System.out.println("PREDICTING THE SCORE : "+price);
+        System.out.println("PREDICTING THE SCORE : "+prediction);
 
         System.out.println("---------Post Processing----------------");
         double newScore =  0;
