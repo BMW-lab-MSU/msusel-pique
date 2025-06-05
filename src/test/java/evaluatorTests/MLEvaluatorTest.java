@@ -30,6 +30,8 @@ import pique.model.QualityModel;
 import pique.model.QualityModelImport;
 import utilities.PiqueTestProperties;
 import utilities.PiqueTestProperties_afterBenchmarker;
+import utilities.PiqueTestProperties_afterWeighter;
+
 
 
 public class MLEvaluatorTest {
@@ -48,27 +50,32 @@ public class MLEvaluatorTest {
 
     @Test
     public void MLEvaluatorTest(){
-        Properties prop = PiqueTestProperties_afterBenchmarker.getProperties();
+        Properties prop = PiqueTestProperties_afterWeighter.getProperties();
 
         Path blankqmFilePath = Paths.get(prop.getProperty("blankqm.filepath"));
         String pathToCsv = prop.getProperty("benchmark.pathToCSV");
 
         QualityModelImport qmImport = new QualityModelImport(blankqmFilePath);
         QualityModel qmDescription = qmImport.importQualityModel();
-        IWeighter weighter = new MLWeighter();
+//        IWeighter weighter = new MLWeighter();
 //        Set<WeightResult> results = weighter.elicitateWeights(qmDescription, Paths.get(pathToCsv));
 
 
         Map<String, ModelNode> qaNodes= qmDescription.getQualityAspects();
 
-        Map<String, ModelNode> msNodes= qmDescription.getMeasures();
-        msNodes.forEach((msNodeName,msNode)->{
-            msNode.setValue(new BigDecimalWithContext(0.0));
-        });
+//        Map<String, ModelNode> msNodes= qmDescription.getMeasures();
+//        msNodes.forEach((msNodeName,msNode)->{
+//            msNode.setValue(new BigDecimalWithContext(0.5));
+//
+//        });
 
+        qmDescription.getMeasures().forEach((measName,meas)->{});
 
         qaNodes.forEach((qaNodeName,qaNode)->{
-            System.out.println(qaNodeName+"\t"+qaNode);
+            System.out.println(qaNodeName);
+
+            qaNode.getIndirectChildren().forEach((indirectChildName,indirectChild)->{
+                indirectChild.setValue(new BigDecimalWithContext(0.9));});
 
             MLEvaluator qaEvaluator = new MLEvaluator();
 
