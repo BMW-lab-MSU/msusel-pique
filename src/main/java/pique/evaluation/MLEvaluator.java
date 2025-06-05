@@ -1,5 +1,6 @@
 package pique.evaluation;
 
+import java.lang.reflect.Array;
 import java.math.BigDecimal;
 
 import pique.evaluation.Evaluator;
@@ -21,6 +22,7 @@ import weka.filters.unsupervised.instance.RemovePercentage;
 import weka.filters.supervised.instance.StratifiedRemoveFolds;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import static pique.calibration.MLWeighter.addToArray;
 
@@ -36,7 +38,7 @@ public class MLEvaluator extends Evaluator {
         String nodeName = inNode.getName();
         BigDecimal outValue = new BigDecimalWithContext("0.0");
 
-        BigDecimal[] inValues = new BigDecimal[0];
+//        BigDecimal[] inValues = new BigDecimal[0];
 
         var ref = new Object() {
             int n_child = 0;
@@ -55,43 +57,67 @@ public class MLEvaluator extends Evaluator {
 
 
         if (inNode.getIndirectChildren() != null) {
-            ref.n_child = inNode.getNumChildren();
-//            Instance inValues = new DenseInstance(ref.n_child);
-            for (ModelNode child : inNode.getIndirectChildren().values()) {
+            System.out.println("Indirect children");
+            ref.n_child = inNode.getNumIndirectChildren();
+            ref.vals = new double[ref.n_child];
+            inNode.getIndirectChildren().forEach((childName, child)->{
                 System.out.println(child.getName());
 
-
-                if (!ref.atts.contains(new Attribute(child.getName()))) {
-                    ref.cnt_child += 1;
-                    ref.atts.add(new Attribute(child.getName()));
-
+                if (!ref.atts.contains(new Attribute(childName))) {
+                    ref.atts.add(new Attribute(childName));
                     BigDecimal value = child.getValue();
                     System.out.println(value);
 
-                    inValues = addToArray(inValues, value);
+                    ref.vals[ref.cnt_child] = value.doubleValue();
 
-//                    ref.arrayVals.add(value);
-
-
+                    ref.cnt_child += 1;
                 }else{
+                    System.out.println("Duplicate found");
                 }
-            }
+            });
         } else {
+            System.out.println("Direct children");
             ref.n_child = inNode.getNumChildren();
-//            Instance inValues = new DenseInstance(ref.n_child);
-            for (ModelNode child : inNode.getChildren().values()) {
+            ref.vals = new double[ref.n_child];
+            inNode.getChildren().forEach((childName, child)-> {
                 System.out.println(child.getName());
-                BigDecimal value = child.getValue();
-                System.out.println(value);
-            }
+
+                if (!ref.atts.contains(new Attribute(childName))) {
+                    ref.atts.add(new Attribute(childName));
+                    BigDecimal value = child.getValue();
+                    System.out.println(value);
+
+                    ref.vals[ref.cnt_child] = value.doubleValue();
+
+                    ref.cnt_child += 1;
+                }else{
+                    System.out.println("Duplicate found");
+                }
+            });
 
         }
+
+        ref.atts.add(new Attribute("Average"));
+        ref.data = new Instances(inNode.getName(), ref.atts, 0);
+
+        ref.data.add(new DenseInstance(1.0, ref.vals));
+        System.out.println(ref.data);
+
+        if (ref.data.classIndex() == -1) {
+//            System.out.println("reset index...");
+            ref.data.setClassIndex(ref.n_child - 1);
+        }
+//        ref.data.setValue(1, );
 
         // loading the model
         System.out.println("----------loading model---------------");
         try {
             Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./src/test/out/ML/"+nodeName+"_lin.model");
             System.out.println(loaded_model);
+
+            outValue = BigDecimal.valueOf(loaded_model.classifyInstance(ref.data.get(0)));
+
+            System.out.println(outValue);
         }
         catch (Exception e) {
             e.printStackTrace();
