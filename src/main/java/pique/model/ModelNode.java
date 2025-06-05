@@ -213,6 +213,10 @@ public abstract class ModelNode {
         return this.value;
     }
 
+    public BigDecimal viewValue() {
+        return this.value;
+    }
+
     public BigDecimal getWeight(String modelNodeName) {
     	return weights.getOrDefault(modelNodeName, new BigDecimalWithContext("0.0"));
     }
