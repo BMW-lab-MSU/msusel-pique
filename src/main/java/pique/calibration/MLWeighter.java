@@ -55,7 +55,9 @@ import weka.classifiers.trees.RandomForest;
 import weka.filters.Filter;
 import weka.filters.unsupervised.instance.RemovePercentage;
 import weka.filters.supervised.instance.StratifiedRemoveFolds;
+import weka.classifiers.Evaluation;
 
+import java.util.Random;
 import java.util.ArrayList;
 
 import static java.lang.Long.sum;
@@ -425,9 +427,13 @@ public class MLWeighter implements IWeighter{
 
             try {
                 assert data != null;
-                Classifier model = testWeka(data);
+//                Classifier model = testWeka(data);
+                Classifier model = wekaRegression(data);
+
+
                 // Saving the model
                 System.out.println("----------saving model---------------");
+                // TODO: get save location from prop
                 SerializationHelper.write("./src/test/out/ML/"+node.getName()+"_lin.model",model);
             } catch (Exception e) {
                 e.printStackTrace();
@@ -634,7 +640,7 @@ public class MLWeighter implements IWeighter{
         for (int i = 0; i < n_attributes; i++) {
             double att_value = inValues.value(i);
             Instance newInValues = inValues;
-            for (double j = 0; j <= att_value; j=j+0.1) {
+            for (double j = 0; j <= att_value; j=j+0.01) {
                 newInValues.setValue(i,j);
                 newScore = Math.max(newScore, model.classifyInstance(newInValues));
 
@@ -671,6 +677,41 @@ public class MLWeighter implements IWeighter{
 
         return newData;
     }
+
+    public static Classifier wekaRegression(Instances data) throws Exception {
+        System.out.println("Cleaned data");
+        Instances cleanedData = new Instances(removeConstantAttributes(data));
+
+        data.setClassIndex(data.numAttributes() - 1); // Set the target attribute
+
+        // Model selection
+        RandomForest model = new RandomForest();
+
+        // Model Properties
+//        model.setNumTrees(100); // Example: set 100 trees
+        // rf.setMaxDepth(10); // Example: set max depth
+
+        // Cross validation
+        int numFolds = 10; // Example: 10-fold cross-validation
+        Random random = new Random(1); // Seed for reproducibility
+
+        Evaluation eval = new Evaluation(data);
+        eval.crossValidateModel(model, data, numFolds, random);
+
+
+        // Evaluation results
+        System.out.println(eval.toSummaryString("=== Random Forest Regression Cross-Validation Results ===", false));
+        System.out.println("Mean Absolute Error (MAE): " + eval.meanAbsoluteError());
+        System.out.println("Root Mean Squared Error (RMSE): " + eval.rootMeanSquaredError());
+        System.out.println("R-squared: " + eval.correlationCoefficient()); // Correlation coefficient is often used as R-squared for regression
+
+        // 5. Train the model
+        model.buildClassifier(data);
+
+        return (Classifier) model;
+//        return  model;
+    }
+
 
     public static Classifier testWeka(Instances dataset) throws Exception{
         //Load Data set
@@ -736,6 +777,8 @@ public class MLWeighter implements IWeighter{
         System.out.println(train.size());
 
         //Build model
+        // TODO: Train with cross validation of the dataset
+        // TODO: Model selection from the porp
 //        SimpleLinearRegression model = new SimpleLinearRegression();
 //        LinearRegression model = new LinearRegression();
 //        MultilayerPerceptron model = new MultilayerPerceptron();
@@ -746,19 +789,19 @@ public class MLWeighter implements IWeighter{
         System.out.println("LR FORMULA : "+model);
 
         // Saving the model
-        System.out.println("----------saving model---------------");
+        System.out.println("----------Saving model---------------");
         weka.core.SerializationHelper.write("./lin.model",model);
 
         // loading the model
-        System.out.println("----------loading model---------------");
+        System.out.println("----------Loading model---------------");
         Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./lin.model");
 
         // Now Predicting the cost
         Instance sampleInstance = test.lastInstance();
         double prediction = loaded_model.classifyInstance(sampleInstance);
-        System.out.println("-------------------------");
+        System.out.println("---------Test sample----------------");
         System.out.println(sampleInstance);
-        System.out.println("PREDICTING THE SCORE : "+prediction);
+        System.out.println("TEST PREDICTION: "+prediction);
 
         System.out.println("---------Post Processing----------------");
         double newScore =  0;
