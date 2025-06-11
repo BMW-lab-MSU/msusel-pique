@@ -112,6 +112,8 @@ public class MLEvaluator extends Evaluator {
         // loading the model
         System.out.println("----------loading model---------------");
         try {
+            // TODO: Get the model location from the prop
+            // T
             Classifier loaded_model = (Classifier) weka.core.SerializationHelper.read("./src/test/out/ML/"+nodeName+"_lin.model");
             System.out.println(loaded_model);
 
